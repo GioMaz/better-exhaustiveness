@@ -103,7 +103,7 @@ into an algebraic data type thus allowing for pattern matching of the following
 form:
 
 ```gleam
-type ABC { A(Int), B, C }
+type ABC { A(Int) B C }
 
 fn works() {
   let a = A(5)
@@ -119,11 +119,11 @@ constructors in order to rule out as many useless branches as possible.
 That would allow the following code, which is rejected today, to compile:
 
 ```gleam
-type ABC { A(Int), B, C }
+type ABC { A(Int) B C }
 
 fn fails() {
   let n = 5
-  let a = match foo() {
+  let a = case foo() {
     0 -> A(n-1)
     _ -> A(n+1)
   }
@@ -143,5 +143,22 @@ We expect to take advantage of the following techniques:
   variables)
 - Interprocedural analysis (for basing our analysis on the result of functions,
   since the Gleam language favors recursion compared to iteration)
+
+# Plan
+
+We expect to spend around 60 to 80 hours in total on the project. The schedule
+below is a guideline rather than a fixed plan: after each step we want a
+working and tested analysis, and we will decide what comes next based on how
+far we got.
+
+| Period | Milestone |
+|---|---|
+| Nov 16–22 | Getting to know the Gleam compiler and its `exhaustiveness` module. Intraprocedural constructor analysis on `let` bindings and `case` expressions, connected to the exhaustiveness check so that ruled-out branches can be omitted, with tests. |
+| Nov 23–29 | Interprocedural analysis for function results, including recursive functions. Path sensitivity, and interval analysis for `Int` fields and guards. |
+| Nov 30–Dec 4 | Evaluation on real Gleam projects and fixes; presentation on December 3 and report on December 4. |
+
+The first week is mostly about finding our way around the compiler, so we keep
+the analysis itself narrow there and leave function calls and intervals for the
+second week.
 
 # References
