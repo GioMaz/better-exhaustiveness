@@ -19,21 +19,22 @@ $$
 
 $$
 \begin{array}{rcl}
-\text{Statements} & s \Coloneqq & e \mid \textit{let } x = e \mid \textit{assert } e \\
-\text{Expressions} & e \Coloneqq & n \mid C(e, \dots, e) \mid x \mid (e, \dots, e) \mid e + e \\
-& \mid & \textit{case } e \; \{ C \mapsto e, \dots, C \mapsto e \} \\
-& \mid & \{ s, \dots, s, e \}
+s & \Coloneqq & e \mid \textit{let } x = e \mid \textit{assert } e \\
+e & \Coloneqq & C(e, \dots, e) \mid x \\
+& \mid & \textit{case } e \; \{ C(v, \dots, v) \mapsto e, \dots, C(v, \dots, v) \mapsto e \} \\
+& \mid & \{ s, \dots, s, e \} \\
+v & \Coloneqq & C(v, \dots, v) \\
+C & \Coloneqq & \{ \text{constructors that appear as literals} \}
 \end{array}
 $$
 
+We assume there are no free variables, a case ruled out by Gleam's semantic analysis.
+
 ### Intraprocedural constructor analysis
 
-We start by defining a constructor analysis that only takes into consideration finite types, i.e. types defined without using primitive types
+For now we restrict the analysis to the intraprocedural case. In this case there is no need to compute the fixpoint of the constraints because there are no loops in the CFG of the body of a function. This is because Gleam does not allow for iteration. An advantage of this is that we obtain a valid state simply by performing a linear scan of the AST. Moreover, we can afford to use an infinite-height lattice as a state:
 
-- $\boxed{\textit{Val}} = \mathcal P(\textit{Ctor})$ is an abstract value, where $\textit{Ctor}$ is the set of constructors that appear as literals in the program
-- $\boxed{\textit{State}} = \textit{Var} \to \textit{Val}$
-
-For now we restrict the analysis to the intraprocedural case. Because Gleam does not allow for iteration, there are no loops in the CFG of the body of a function. Therefore, we obtain a valid state simply by performing a linear scan of the AST.
+$\boxed{\textit{State}} = \textit{Var} \to \mathcal P(v)$
 
 $\boxed{t : \textit{State} \times s \to \textit{State}}$
 
@@ -49,13 +50,10 @@ $\boxed{\textit{eval} : \textit{State} \times e \to \textit{Val}}$
 
 $$
 \begin{aligned}
-\textit{eval}(\sigma, n) & = \emptyset \\
-\textit{eval}(\sigma, C) & = \{ C \} \\
+\textit{eval}(\sigma, C(e_1, \dots, e_n)) & = \{ C(v_1, \dots, v_n) \mid v_i \in \textit{eval}(\sigma, e_i) \} \\
 \textit{eval}(\sigma, x) & = \sigma(x) \\
-\textit{eval}(\sigma, (e_1, \dots, e_n)) & = \prod_{i \in \{ 1, \dots, n \}} \textit{eval}(\sigma, e_i) \\
-\textit{eval}(\sigma, e + e) & = \emptyset \\
-\textit{eval}(\sigma, \textit{case } x \; \{ C_i(e_{ij}) \mapsto e_i \}) & = \bigcup_{i \in \{ 1, \dots, n \}} \textit{eval}(\textit{assert}(\sigma, x == C_i(e_{ij})), e_i) \\
-\textit{eval}(\sigma, \textit{case } e \; \{ C_i(e_{ij}) \mapsto e_i \}) & = \bigcup_{i \in \{ 1, \dots, n \}} \textit{eval}(\sigma, e_i) \\
+\textit{eval}(\sigma, \textit{case } x \; \{ C_i(v_{ij}) \mapsto e_i \}) & = \bigcup_{i \in \{ 1, \dots, n \}} \begin{cases} \textit{eval}(\textit{assert}(\sigma, x == C_i(v_{ij})), e_i) & \text{if } C_i(v_{ij}) \in \textit{eval}(\sigma, x) \\ \empty & \text{otherwise} \end{cases} \\
+\textit{eval}(\sigma, \textit{case } e \; \{ C_i(v_{ij}) \mapsto e_i \}) & = \bigcup_{i \in \{ 1, \dots, n \}} \begin{cases} \textit{eval}(\sigma, e_i) & \text{if } C_i(v_{ij}) \in \textit{eval}(\sigma, e) \\ \empty & \text{otherwise} \end{cases} \\
 \textit{eval}(\sigma, \{ s_1, \dots, s_n, e \}) & = \textit{eval}(\_, e) \circ t(\_, s_n) \circ \dots \circ t(\_, s_2)(t(\sigma, s_1)) \\
 \end{aligned}
 $$
@@ -64,6 +62,6 @@ $\boxed{\textit{assert} : \textit{State} \times e \to \textit{State}}$
 
 $$
 \begin{aligned}
-\textit{assert}(\sigma, x == C(e_1, \dots, e_n)) & = \sigma[x \mapsto \{ C(C_1, \dots, C_n) \mid C_i \in \textit{eval}(\sigma, e_i)\}]
+\textit{assert}(\sigma, x == C(e_1, \dots, e_n)) & = \sigma[x \mapsto \{ C(v_1, \dots, v_n) \mid v_i \in \textit{eval}(\sigma, e_i)\}]
 \end{aligned}
 $$
